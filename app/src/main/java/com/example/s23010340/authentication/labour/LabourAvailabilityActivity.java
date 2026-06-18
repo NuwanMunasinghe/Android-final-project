@@ -17,9 +17,11 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.Toast;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import java.net.URISyntaxException;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -391,7 +393,34 @@ public class LabourAvailabilityActivity extends AppCompatActivity {
         WebSettings settings = mapPreviewWebView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        mapPreviewWebView.setWebViewClient(new WebViewClient());
+        settings.setSupportMultipleWindows(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        
+        mapPreviewWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (url.startsWith("intent://")) {
+                    try {
+                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                        if (intent != null) {
+                            if (getPackageManager().resolveActivity(intent, 0) != null) {
+                                startActivity(intent);
+                                return true;
+                            }
+                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            if (fallbackUrl != null) {
+                                view.loadUrl(fallbackUrl);
+                                return true;
+                            }
+                        }
+                    } catch (URISyntaxException e) {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        });
         searchLocationOnMap("Sri Lanka");
     }
 
@@ -429,13 +458,9 @@ public class LabourAvailabilityActivity extends AppCompatActivity {
             } else {
                 appInfo = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
             }
-            if (appInfo.metaData == null) {
-                return "";
-            }
+            if (appInfo.metaData == null) return "";
             Object keyObj = appInfo.metaData.get("com.google.android.geo.API_KEY");
-            if (keyObj instanceof String) {
-                return ((String) keyObj).trim();
-            }
+            if (keyObj instanceof String) return ((String) keyObj).trim();
             return "";
         } catch (PackageManager.NameNotFoundException exception) {
             return "";

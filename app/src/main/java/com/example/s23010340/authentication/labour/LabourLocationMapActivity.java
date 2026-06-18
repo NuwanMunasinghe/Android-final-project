@@ -6,11 +6,13 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.s23010340.R;
+import java.net.URISyntaxException;
 
 public class LabourLocationMapActivity extends AppCompatActivity {
     public static final String EXTRA_LOCATION = "extra_location";
@@ -46,12 +48,39 @@ public class LabourLocationMapActivity extends AppCompatActivity {
             return;
         }
 
-        // Fallback to WebView with Maps Embed API
+        // Fallback to WebView
         WebView mapWebView = findViewById(R.id.map_web_view);
         WebSettings settings = mapWebView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        mapWebView.setWebViewClient(new WebViewClient());
+        settings.setSupportMultipleWindows(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+
+        mapWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (url.startsWith("intent://")) {
+                    try {
+                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                        if (intent != null) {
+                            if (getPackageManager().resolveActivity(intent, 0) != null) {
+                                startActivity(intent);
+                                return true;
+                            }
+                            String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                            if (fallbackUrl != null) {
+                                view.loadUrl(fallbackUrl);
+                                return true;
+                            }
+                        }
+                    } catch (URISyntaxException e) {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        });
         
         String mapsApiKey = getMapsApiKey();
         if (mapsApiKey.isEmpty()) {
